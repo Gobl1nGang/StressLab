@@ -11,7 +11,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.backtester import Backtester
 from engine.strategy import Strategy, SMA, RSI, Indicator
 from engine.dataloader import fetch_market_data
-# from engine.falsifier import Falsifier # Keep commented if causing issues, or uncomment if fixed
+# from engine.falsifier import Falsifier 
+
+import pandas as pd
+import numpy as np
+import uuid
+from datetime import datetime
+from fastapi.encoders import jsonable_encoder
+
 
 
 # from security.auth import Token, create_access_token, decode_access_token, verify_password, get_password_hash
@@ -86,10 +93,23 @@ async def root():
     return {"message": "Trading Strategy Falsifier API is running"}
 
 @app.post("/backtest", response_model=BacktestResponse)
-async def run_backtest(request: StrategyRequest, current_user: dict = Depends(get_current_user)):
-    # 1. Fetch Data
+async def run_backtest(request: StrategyRequest, current_user: dict = Depends(get_current_user), db: Session = Depends(get_db)):
+    # 1. Fetch Data (Mock or Real)
     try:
-        data = fetch_market_data(request.ticker)
+        if request.ticker.upper() == "MOCK":
+            # Generate Mock Data
+            dates = pd.date_range(start="2023-01-01", periods=100, freq="D")
+            prices = 100 + np.random.randn(100).cumsum()
+            data = pd.DataFrame({
+                "Date": dates,
+                "Open": prices,
+                "High": prices + 1,
+                "Low": prices - 1,
+                "Close": prices,
+                "Volume": 100000
+            })
+        else:
+            data = fetch_market_data(request.ticker)
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
 
@@ -121,6 +141,29 @@ async def run_backtest(request: StrategyRequest, current_user: dict = Depends(ge
         {"date": str(t['date']), "type": t['type'], "price": t['price']}
         for t in results['trades']
     ]
+    
+    # 5. Save to Database
+    try:
+        db_result = DbSimulationResult(
+            simulation_uuid=str(uuid.uuid4()),
+            ticker=request.ticker,
+            strategy_name="Custom Strategy", # Could be dynamic
+            start_date=datetime.now(), # Should be from request/data
+            end_date=datetime.now(),
+            final_capital=results['final_capital'],
+            total_return_pct=(results['final_capital'] - request.initial_capital) / request.initial_capital,
+            max_drawdown_pct=0.0, # Backtester needs to return this
+            falsification_triggered=False,
+            trades_json=jsonable_encoder(formatted_trades),
+            equity_curve_json=jsonable_encoder(results['equity_curve']),
+            warnings_json=[],
+            owner_id=current_user.get("id") # From the auth token
+        )
+        db.add(db_result)
+        db.commit()
+    except Exception as e:
+        print(f"Failed to save to DB: {e}")
+        # Don't fail the request just because DB save failed
     
     return BacktestResponse(
         final_capital=results['final_capital'],
