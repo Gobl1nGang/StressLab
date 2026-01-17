@@ -3,10 +3,12 @@ uvicorn
 pydantic
 python-multipart
 requests
-yfinance
+yfinance==0.2.33
 pandas
 numpy
 torch
 scikit-learn
 python-jose[cryptography]
 passlib[argon2]
+sqlalchemy
+alembic

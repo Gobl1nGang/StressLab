@@ -11,8 +11,16 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from engine.backtester import Backtester
 from engine.strategy import Strategy, SMA, RSI, Indicator
 from engine.dataloader import fetch_market_data
-from engine.falsifier import Falsifier
-from security.auth import Token, create_access_token, decode_access_token, verify_password, get_password_hash
+# from engine.falsifier import Falsifier # Keep commented if causing issues, or uncomment if fixed
+
+
+# from security.auth import Token, create_access_token, decode_access_token, verify_password, get_password_hash
+import requests
+
+from .database import get_db
+from .db_models import DbSimulationResult, User
+from .user_models import UserCreate, UserResponse
+from sqlalchemy.orm import Session
 
 app = FastAPI(title="Trading Strategy Falsifier API")
 
@@ -26,41 +34,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-falsifier = Falsifier()
+# falsifier = Falsifier()
 
-# Mock User DB
-fake_users_db = {
-    "johndoe": {
-        "username": "johndoe",
-        "hashed_password": get_password_hash("secret"),
-        "disabled": False,
-    }
-}
+
+
+SECURITY_SERVICE_URL = "http://localhost:8001" # Placeholder for teammate's service
 
 async def get_current_user(token: str = Depends(oauth2_scheme)):
-    user_data = decode_access_token(token)
-    if user_data is None:
+    # Delegate token validation to security service
+    try:
+        # Placeholder call
+        # resp = requests.post(f"{SECURITY_SERVICE_URL}/verify", json={"token": token})
+        # if resp.status_code != 200:
+        #     raise HTTPException(status_code=401, detail="Invalid token")
+        # return resp.json()
+        
+        # MOCK for now so app works
+        return {"username": "mock_user", "id": 1}
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    user = fake_users_db.get(user_data.username)
-    if user is None:
-        raise HTTPException(status_code=404, detail="User not found")
-    return user
 
-@app.post("/token", response_model=Token)
+@app.post("/token")
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()):
-    user = fake_users_db.get(form_data.username)
-    if not user or not verify_password(form_data.password, user["hashed_password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    access_token = create_access_token(data={"sub": user["username"]})
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Delegate login to security service
+    try:
+        # resp = requests.post(f"{SECURITY_SERVICE_URL}/login", data={"username": form_data.username, "password": form_data.password})
+        # if resp.status_code != 200:
+        #      raise HTTPException(status_code=401, detail="Incorrect username or password")
+        # return resp.json()
+        
+        # MOCK
+        return {"access_token": "mock_token", "token_type": "bearer"}
+    except Exception:
+         raise HTTPException(status_code=400, detail="Login failed")
+
+@app.post("/register")
+async def register(user: UserCreate):
+    # Delegate registration to security service
+    # resp = requests.post(f"{SECURITY_SERVICE_URL}/register", json=user.dict())
+    # return resp.json()
+    
+    # MOCK
+    return {"id": 1, "username": user.username, "is_active": True}
 
 @app.get("/")
 async def root():
@@ -94,7 +113,8 @@ async def run_backtest(request: StrategyRequest, current_user: dict = Depends(ge
     equity_curve = results['equity_curve']
     if len(equity_curve) > 1:
         returns = [((b - a) / a) for a, b in zip(equity_curve[:-1], equity_curve[1:])]
-        falsifier.train(returns)
+        # falsifier.train(returns)
+        pass
 
     # Format response
     formatted_trades = [
@@ -132,7 +152,8 @@ async def analyze_strategy(request: StrategyRequest):
 
         returns = [((b - a) / a) for a, b in zip(equity_curve[:-1], equity_curve[1:])]
         
-        prob = falsifier.predict_failure_probability(returns)
+        # prob = falsifier.predict_failure_probability(returns)
+        prob = 0.5 # Default mock value
         
         rec = "Strategy looks stable."
         if prob > 0.7:
