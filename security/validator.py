@@ -21,7 +21,7 @@ class SQLDataValidator:
         r"(&#39;|&quot;|%27|%22)",
         r"(\\x27|\\x22|\\u0027|\\u0022)"
     ]
-    
+
     @classmethod
     def validate_column_name(cls, column: str) -> bool:
         """Validate column name against allow list"""

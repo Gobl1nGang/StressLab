@@ -108,7 +108,7 @@ class TestDangerousInputs(unittest.TestCase):
         dangerous_data = [
             {'strategy_name': "'; DROP TABLE strategies; --", 'symbol': 'AAPL', 'username': 'johndoe'},
             {'strategy_name': 'Valid Strategy', 'symbol': 'AAPL', 'username': "admin'--"},
-            {'strategy_name': 'Valid Strategy', 'symbol': 'TOOLONG', 'username': 'johndoe'},
+            {'strategy_name': 'Valid Strategy', 'symbol': 'TOOLONGERTHAN10', 'username': 'johndoe'},
             {'strategy_name': 'UNION SELECT', 'symbol': 'AAPL', 'username': 'johndoe'}
         ]
         for data in dangerous_data:
