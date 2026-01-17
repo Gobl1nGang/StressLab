@@ -1,5 +1,7 @@
 import re
 import html
+import json
+import unicodedata
 from typing import List, Optional, Any
 from pydantic import BaseModel, validator, ValidationError
 
@@ -11,6 +13,7 @@ class SQLDataValidator:
     
     # Injection patterns
     SQL_INJECTION_PATTERNS = [
+        # uses regex expressions to check for potentially dangerous sequences
         r"(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)",
         r"(--|#|/\*|\*/)",
         r"(\b(or|and)\s+\d+\s*=\s*\d+)",
@@ -19,19 +22,44 @@ class SQLDataValidator:
         r"(\bxp_cmdshell\b)",
         r"(\bsp_executesql\b)",
         r"(&#39;|&quot;|%27|%22)",
-        r"(\\x27|\\x22|\\u0027|\\u0022)"
+        r"(\\x27|\\x22|\\u0027|\\u0022)",
+        r"([\u0000-\u001f\u007f-\u009f])",
+        r"([\u2000-\u206f\u2e00-\u2e7f])",
+        r"(;\s*$|;\s*--)",
+        r"(\r\n|\n|\r).*?(union|select|drop|delete)",
+        r"(\\n|\\r|\\t)",
+        r"(\x0a|\x0d|\x09)"
+
     ]
 
+    # Normalize and validate Unicode input to reduce character differences
+    @classmethod
+    def normalize_unicode(cls, value: str) -> str:
+        """Normalize Unicode to prevent dangerous characters"""
+        if not isinstance(value, str):
+            value = str(value)
+        
+        # Normalize to NFC form
+        normalized = unicodedata.normalize('NFC', value)
+        
+        # Remove control characters
+        cleaned = ''.join(char for char in normalized if unicodedata.category(char) not in ['Cc', 'Cf'])
+        
+        return cleaned
+
+    # Check if column name is in allowed list
     @classmethod
     def validate_column_name(cls, column: str) -> bool:
         """Validate column name against allow list"""
         return column.lower() in cls.ALLOWED_COLUMNS
     
+    # Check if SQL operator is in allowed list
     @classmethod
     def validate_operator(cls, operator: str) -> bool:
         """Validate SQL operator against allow list"""
         return operator.upper() in cls.ALLOWED_OPERATORS
     
+    # Escape single quotes and HTML entities to prevent injection
     @classmethod
     def escape_sql_string(cls, value: str) -> str:
         """Escape SQL string to prevent injection"""
@@ -44,6 +72,7 @@ class SQLDataValidator:
         escaped = html.escape(escaped)
         return escaped
     
+    # Scan input for SQL injection patterns using regex
     @classmethod
     def detect_sql_injection(cls, input_str: str) -> bool:
         """Detect potential SQL injection patterns"""
@@ -56,6 +85,7 @@ class SQLDataValidator:
                 return True
         return False
     
+    # Convert input to string, check for injection, and escape
     @classmethod
     def sanitize_input(cls, value: Any) -> str:
         """Sanitize input value"""
@@ -64,12 +94,34 @@ class SQLDataValidator:
         
         str_value = str(value).strip()
         
+        # Normalize Unicode
+        str_value = cls.normalize_unicode(str_value)
+        
         # Check for injection
         if cls.detect_sql_injection(str_value):
             raise ValueError("Potential SQL injection detected")
         
         # Escape and return
         return cls.escape_sql_string(str_value)
+
+    # Parse JSON string and return as dictionary with normalized Unicode
+    @classmethod
+    def parse_json_to_dict(cls, json_str: str) -> dict:
+        """Parse JSON string to dictionary"""
+        try:
+            data = json.loads(json_str)
+        except json.JSONDecodeError:
+            raise ValueError("Invalid JSON format")
+        
+        # Normalize Unicode for all string values
+        normalized_data = {}
+        for key, value in data.items():
+            if isinstance(value, str):
+                normalized_data[key] = cls.normalize_unicode(value)
+            else:
+                normalized_data[key] = value
+        
+        return normalized_data
 
 class StrategyData(BaseModel):
     """Bean validation model for strategy data"""
@@ -121,6 +173,16 @@ class QueryFilter(BaseModel):
     def validate_value(cls, v):
         return SQLDataValidator.sanitize_input(v)
 
+# Complete workflow: Parse JSON → Normalize Unicode → Validate Security
+def validate_json_workflow(json_str: str, model_class: BaseModel) -> dict:
+    """Complete validation workflow for JSON input"""
+    # Step 1: Parse JSON to dictionary
+    data = SQLDataValidator.parse_json_to_dict(json_str)
+    
+    # Step 2: Validate using security functions (Unicode already normalized)
+    return validate_sql_data(data, model_class)
+
+# Validate dictionary data using Pydantic models
 def validate_sql_data(data: dict, model_class: BaseModel) -> dict:
     """Validate SQL data using bean validation"""
     try:
@@ -129,6 +191,7 @@ def validate_sql_data(data: dict, model_class: BaseModel) -> dict:
     except ValidationError as e:
         raise ValueError(f"Validation failed: {e}")
 
+# Process SQL query results and validate each field
 def safe_sql_fetch(query_result: List[tuple], expected_columns: List[str]) -> List[dict]:
     """Safely process SQL query results"""
     validated_results = []
