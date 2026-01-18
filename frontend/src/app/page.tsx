@@ -3,25 +3,63 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StrategyBuilder from '@/components/StrategyBuilder';
 import Dashboard from '@/components/Dashboard';
+import SimulationDashboard from '@/components/SimulationDashboard';
 import Login from '@/components/Login';
 import { runBacktest, analyzeStrategy, StrategyRequest, BacktestResponse, AnalysisResponse } from '@/lib/api';
+import { streamSimulation, SimulationState, SimulationResults } from '@/lib/simulationApi';
 import { LayoutGrid, Loader2, AlertCircle } from 'lucide-react';
 
 export default function Home() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [backtestResults, setBacktestResults] = useState<BacktestResponse | null>(null);
     const [analysisResults, setAnalysisResults] = useState<AnalysisResponse | null>(null);
+
+    // Simulation state
+    const [simulationStates, setSimulationStates] = useState<SimulationState[]>([]);
+    const [simulationResults, setSimulationResults] = useState<SimulationResults | null>(null);
+    const [isSimulating, setIsSimulating] = useState(false);
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const handleRunBacktest = async (strategy: StrategyRequest) => {
         setLoading(true);
         setError(null);
+        setBacktestResults(null);
+        setAnalysisResults(null);
+        setSimulationStates([]);
+        setSimulationResults(null);
+
         try {
+            // 1. Run Backtest (Static)
             const results = await runBacktest(strategy);
             setBacktestResults(results);
             const analysis = await analyzeStrategy(strategy);
             setAnalysisResults(analysis);
+
+            // 3. Start Real-Time Simulation Playback
+            setIsSimulating(true);
+            await streamSimulation(
+                {
+                    ticker: strategy.ticker,
+                    indicators: strategy.indicators,
+                    rules: strategy.rules,
+                    initial_capital: strategy.initial_capital,
+                    speed: 2.0 // 2 days per second for demo
+                },
+                (state) => {
+                    setSimulationStates(prev => [...prev, state]);
+                },
+                (results) => {
+                    setSimulationResults(results);
+                    setIsSimulating(false);
+                },
+                (err) => {
+                    setError(`Simulation error: ${err}`);
+                    setIsSimulating(false);
+                }
+            );
+
         } catch (err: any) {
             setError(err.message || 'An error occurred during simulation');
         } finally {
@@ -59,7 +97,7 @@ export default function Home() {
             {/* Main Content / Dashboard */}
             <main className="flex-1 overflow-y-auto bg-[#0b0e11] relative">
                 <AnimatePresence mode="wait">
-                    {loading ? (
+                    {loading && !isSimulating ? (
                         <motion.div
                             key="loading"
                             initial={{ opacity: 0 }}
@@ -86,12 +124,24 @@ export default function Home() {
                         </motion.div>
                     ) : (
                         <motion.div
-                            key="dashboard"
+                            key="content"
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
-                            className="p-4 h-full"
+                            className="p-4 h-full space-y-6"
                         >
-                            <Dashboard backtestResults={backtestResults} analysisResults={analysisResults} />
+                            {/* Real-Time Simulation Dashboard */}
+                            {(isSimulating || simulationStates.length > 0) && (
+                                <SimulationDashboard
+                                    states={simulationStates}
+                                    results={simulationResults}
+                                    isSimulating={isSimulating}
+                                />
+                            )}
+
+                            {/* Static Analysis Results */}
+                            {!loading && !error && backtestResults && (
+                                <Dashboard backtestResults={backtestResults} analysisResults={analysisResults} />
+                            )}
                         </motion.div>
                     )}
                 </AnimatePresence>
