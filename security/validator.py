@@ -187,46 +187,31 @@ class QueryFilter(BaseModel):
     def validate_value(cls, v):
         return SQLDataValidator.sanitize_input(v)
 
-# Get credentials from port 8000 and process them
-def process_credentials() -> str:
-    """Get credentials from port 8000, validate and send to port 8001"""
+# Validate credentials dictionary and return it or error message
+def process_credentials(credentials: dict):
+    """Validate credentials dictionary - return dict if safe, error message if not"""
     try:
-        # Get dictionary from port 8000
-        response = requests.get('http://localhost:8000/credentials')
-        credentials = response.json()
-        
         # Validate credentials
         validated_creds = validate_credentials(credentials)
-        
-        # Send to port 8001
-        auth_response = requests.post('http://localhost:8001/auth', json=validated_creds)
-        return f"Success: {auth_response.status_code}"
+        return validated_creds
         
     except ValueError as e:
         return str(e)
-    except requests.RequestException as e:
-        return f"Network error: {str(e)}"
 
 # Validate username/password dictionary and return original if safe
 def validate_credentials(credentials: dict) -> dict:
     """Validate username/password dictionary - return original if safe"""
-    # Step 1: Normalize Unicode
-    username = SQLDataValidator.normalize_unicode(credentials['username'])
-    password = SQLDataValidator.normalize_unicode(credentials['password'])
+
+    username = SQLDataValidator.sanitize_input(credentials['username'])
+    password = SQLDataValidator.sanitize_input(credentials['password'])
     
     # Step 2: Validate username format
-    if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+    if not UserCredentials.validate_username(username):
         raise ValueError('Invalid username format')
     
     # Step 3: Validate password format  
-    if len(password) < 8 or len(password) > 128:
+    if UserCredentials.validate_password(password):
         raise ValueError('Password must be 8-128 characters')
-    
-    # Step 4: Check for SQL injection
-    if SQLDataValidator.detect_sql_injection(username):
-        raise ValueError('Invalid characters in username')
-    if SQLDataValidator.detect_sql_injection(password):
-        raise ValueError('Invalid characters in password')
     
     # Step 5: Return original dictionary if all validations pass
     return credentials
