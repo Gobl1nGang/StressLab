@@ -201,20 +201,13 @@ def process_credentials(credentials: dict):
 # Validate username/password dictionary and return original if safe
 def validate_credentials(credentials: dict) -> dict:
     """Validate username/password dictionary - return original if safe"""
-
-    username = SQLDataValidator.sanitize_input(credentials['username'])
-    password = SQLDataValidator.sanitize_input(credentials['password'])
-    
-    # Step 2: Validate username format
-    if not UserCredentials.validate_username(username):
-        raise ValueError('Invalid username format')
-    
-    # Step 3: Validate password format  
-    if UserCredentials.validate_password(password):
-        raise ValueError('Password must be 8-128 characters')
-    
-    # Step 5: Return original dictionary if all validations pass
-    return credentials
+    try:
+        # Use the Pydantic model to validate the dictionary
+        UserCredentials(**credentials)
+        return credentials
+    except ValidationError as e:
+        # Extract the error message from Pydantic's ValidationError
+        raise ValueError(e.errors()[0]['msg'])
 
 # Validate dictionary data using Pydantic models
 def validate_sql_data(data: dict, model_class: BaseModel) -> dict:

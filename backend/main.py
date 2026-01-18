@@ -22,6 +22,7 @@ from fastapi.encoders import jsonable_encoder
 
 
 from security.auth import Token, create_access_token, decode_access_token, verify_password, get_password_hash
+from security.validator import process_credentials
 import requests
 
 from .database import get_db
@@ -62,51 +63,34 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
 
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
-    # Step 1: Send credentials to security service for validation
-    try:
-        security_resp = requests.post(
-            f"{SECURITY_SERVICE_URL}/login",
-            json={"username": form_data.username, "password": form_data.password}
+    # Step 1: Validate credentials format using teammate's security validator
+    result = process_credentials({"username": form_data.username, "password": form_data.password})
+    if isinstance(result, str):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result,
+            headers={"WWW-Authenticate": "Bearer"},
         )
-        
-        if security_resp.status_code != 200:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        
-        # Step 2: If validated, return the token from security service
-        return security_resp.json()
-        
-    except requests.exceptions.ConnectionError:
-        # Fallback to local auth if security service is down
-        user = db.query(User).filter(User.username == form_data.username).first()
-        if not user or not verify_password(form_data.password, user.hashed_password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect username or password",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-        access_token = create_access_token(data={"sub": user.username})
-        return {"access_token": access_token, "token_type": "bearer"}
+    
+    # Step 2: Check credentials against database
+    user = db.query(User).filter(User.username == form_data.username).first()
+    if not user or not verify_password(form_data.password, user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Step 3: Create and return token
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @app.post("/register", response_model=UserResponse)
 async def register(user: UserCreate, db: Session = Depends(get_db)):
-    # Step 1: Send to security service for validation FIRST
-    try:
-        security_resp = requests.post(
-            f"{SECURITY_SERVICE_URL}/validate_register",
-            json={"username": user.username, "password": user.password}
-        )
-        
-        if security_resp.status_code != 200:
-            error_detail = security_resp.json().get("detail", "Registration validation failed")
-            raise HTTPException(status_code=400, detail=error_detail)
-        
-    except requests.exceptions.ConnectionError:
-        # If security service is down, continue with registration
-        pass
+    # Step 1: Validate credentials using teammate's security validator
+    result = process_credentials({"username": user.username, "password": user.password})
+    if isinstance(result, str):
+        raise HTTPException(status_code=400, detail=result)
     
     # Step 2: Check if user already exists in DB
     db_user = db.query(User).filter(User.username == user.username).first()
