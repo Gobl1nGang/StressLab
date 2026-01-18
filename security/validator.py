@@ -1,6 +1,5 @@
 import re
 import html
-import json
 import unicodedata
 from typing import List, Optional, Any
 from pydantic import BaseModel, validator, ValidationError
@@ -104,24 +103,38 @@ class SQLDataValidator:
         # Escape and return
         return cls.escape_sql_string(str_value)
 
-    # Parse JSON string and return as dictionary with normalized Unicode
+    # Normalize dictionary values with Unicode validation
     @classmethod
-    def parse_json_to_dict(cls, json_str: str) -> dict:
-        """Parse JSON string to dictionary"""
-        try:
-            data = json.loads(json_str)
-        except json.JSONDecodeError:
-            raise ValueError("Invalid JSON format")
-        
-        # Normalize Unicode for all string values
+    def normalize_dict_values(cls, data: dict) -> dict:
+        """Normalize Unicode for all string values in dictionary"""
         normalized_data = {}
         for key, value in data.items():
             if isinstance(value, str):
                 normalized_data[key] = cls.normalize_unicode(value)
             else:
                 normalized_data[key] = value
-        
         return normalized_data
+
+class UserCredentials(BaseModel):
+    """Bean validation model for user credentials"""
+    username: str
+    password: str
+    
+    @validator('username')
+    def validate_username(cls, v):
+        if not re.match(r'^[a-zA-Z0-9_]{3,20}$', v):
+            raise ValueError('Invalid username format')
+        if SQLDataValidator.detect_sql_injection(v):
+            raise ValueError('Invalid characters in username')
+        return SQLDataValidator.sanitize_input(v)
+    
+    @validator('password')
+    def validate_password(cls, v):
+        if len(v) < 8 or len(v) > 128:
+            raise ValueError('Password must be 8-128 characters')
+        if SQLDataValidator.detect_sql_injection(v):
+            raise ValueError('Invalid characters in password')
+        return SQLDataValidator.sanitize_input(v)
 
 class StrategyData(BaseModel):
     """Bean validation model for strategy data"""
@@ -173,14 +186,29 @@ class QueryFilter(BaseModel):
     def validate_value(cls, v):
         return SQLDataValidator.sanitize_input(v)
 
-# Complete workflow: Parse JSON → Normalize Unicode → Validate Security
-def validate_json_workflow(json_str: str, model_class: BaseModel) -> dict:
-    """Complete validation workflow for JSON input"""
-    # Step 1: Parse JSON to dictionary
-    data = SQLDataValidator.parse_json_to_dict(json_str)
+# Validate username/password dictionary and return original if safe
+def validate_credentials(credentials: dict) -> dict:
+    """Validate username/password dictionary - return original if safe"""
+    # Step 1: Normalize Unicode
+    username = SQLDataValidator.normalize_unicode(credentials['username'])
+    password = SQLDataValidator.normalize_unicode(credentials['password'])
     
-    # Step 2: Validate using security functions (Unicode already normalized)
-    return validate_sql_data(data, model_class)
+    # Step 2: Validate username format
+    if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+        raise ValueError('Invalid username format')
+    
+    # Step 3: Validate password format  
+    if len(password) < 8 or len(password) > 128:
+        raise ValueError('Password must be 8-128 characters')
+    
+    # Step 4: Check for SQL injection
+    if SQLDataValidator.detect_sql_injection(username):
+        raise ValueError('Invalid characters in username')
+    if SQLDataValidator.detect_sql_injection(password):
+        raise ValueError('Invalid characters in password')
+    
+    # Step 5: Return original dictionary if all validations pass
+    return credentials
 
 # Validate dictionary data using Pydantic models
 def validate_sql_data(data: dict, model_class: BaseModel) -> dict:
