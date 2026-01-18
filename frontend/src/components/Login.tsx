@@ -34,8 +34,9 @@ export default function Login({ onLoginSuccess }: LoginProps) {
                 // setAccessToken(token);
                 // onLoginSuccess();
             }
-        } catch (err: any) {
-            setError(err.message || 'System Access Denied');
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'System Access Denied';
+            setError(errorMessage);
         } finally {
             setIsLoading(false);
         }

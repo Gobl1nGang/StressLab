@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import StrategyBuilder from '@/components/StrategyBuilder';
 import Dashboard from '@/components/Dashboard';
@@ -7,7 +7,7 @@ import SimulationDashboard from '@/components/SimulationDashboard';
 import Login from '@/components/Login';
 import { runBacktest, analyzeStrategy, StrategyRequest, BacktestResponse, AnalysisResponse } from '@/lib/api';
 import { streamSimulation, SimulationState, SimulationResults } from '@/lib/simulationApi';
-import { LayoutGrid, Loader2, AlertCircle } from 'lucide-react';
+import { LayoutGrid, Loader2, AlertCircle, Activity } from 'lucide-react';
 
 export default function Home() {
     const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -21,8 +21,17 @@ export default function Home() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
     const handleRunBacktest = async (strategy: StrategyRequest) => {
+        if (loading || isSimulating) return;
+
+        // Cancel any existing simulation
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+        abortControllerRef.current = new AbortController();
+
         setLoading(true);
         setError(null);
         setBacktestResults(null);
@@ -44,7 +53,7 @@ export default function Home() {
                     ticker: strategy.ticker,
                     indicators: strategy.indicators,
                     rules: strategy.rules,
-                    initial_capital: strategy.initial_capital,
+                    initial_capital: 10000,
                     speed: 2.0 // 2 days per second for demo
                 },
                 (state) => {
@@ -55,13 +64,18 @@ export default function Home() {
                     setIsSimulating(false);
                 },
                 (err) => {
-                    setError(`Simulation error: ${err}`);
+                    if (err !== 'The user aborted a request.' && err !== 'signal is aborted without reason') {
+                        setError(`Simulation error: ${err}`);
+                    }
                     setIsSimulating(false);
-                }
+                },
+                abortControllerRef.current.signal
             );
 
         } catch (err: any) {
-            setError(err.message || 'An error occurred during simulation');
+            if (err.name !== 'AbortError') {
+                setError(err.message || 'An error occurred during simulation');
+            }
         } finally {
             setLoading(false);
         }
@@ -90,7 +104,7 @@ export default function Home() {
                     </div>
                 </div>
                 <div className="p-4">
-                    <StrategyBuilder onRunBacktest={handleRunBacktest} />
+                    <StrategyBuilder onRunBacktest={handleRunBacktest} isLoading={loading || isSimulating} />
                 </div>
             </aside>
 
@@ -109,19 +123,6 @@ export default function Home() {
                             <h3 className="text-xl font-bold">Simulating Market Edge</h3>
                             <p className="text-sm text-[#848e9c]">Falsification engine running neural analysis...</p>
                         </motion.div>
-                    ) : error ? (
-                        <motion.div
-                            key="error"
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            className="p-8 m-4 bg-[#f6465d]/10 border border-[#f6465d]/30 rounded-lg flex items-start space-x-3"
-                        >
-                            <AlertCircle className="w-5 h-5 text-[#f6465d] mt-1" />
-                            <div>
-                                <h4 className="font-bold text-[#f6465d]">Simulation Error</h4>
-                                <p className="text-sm text-[#848e9c]">{error}</p>
-                            </div>
-                        </motion.div>
                     ) : (
                         <motion.div
                             key="content"
@@ -129,6 +130,27 @@ export default function Home() {
                             animate={{ opacity: 1, y: 0 }}
                             className="p-4 h-full space-y-6"
                         >
+                            {/* Error Display */}
+                            {error && (
+                                <motion.div
+                                    initial={{ scale: 0.95, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    className="p-4 bg-[#f6465d]/10 border border-[#f6465d]/30 rounded flex items-start space-x-3"
+                                >
+                                    <AlertCircle className="w-5 h-5 text-[#f6465d] mt-1 shrink-0" />
+                                    <div>
+                                        <h4 className="font-bold text-[#f6465d] text-sm">Simulation Error</h4>
+                                        <p className="text-xs text-[#848e9c]">{error}</p>
+                                        <button
+                                            onClick={() => setError(null)}
+                                            className="mt-2 text-[10px] text-[#848e9c] hover:text-[#eaecef] underline"
+                                        >
+                                            Dismiss
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            )}
+
                             {/* Real-Time Simulation Dashboard */}
                             {(isSimulating || simulationStates.length > 0) && (
                                 <SimulationDashboard
@@ -139,8 +161,21 @@ export default function Home() {
                             )}
 
                             {/* Static Analysis Results */}
-                            {!loading && !error && backtestResults && (
+                            {!loading && backtestResults && (
                                 <Dashboard backtestResults={backtestResults} analysisResults={analysisResults} />
+                            )}
+
+                            {/* Welcome State */}
+                            {!loading && !backtestResults && !isSimulating && !error && (
+                                <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-50">
+                                    <div className="w-20 h-20 rounded-full bg-[#1e2329] flex items-center justify-center border border-[#2b3139]">
+                                        <Activity className="w-10 h-10 text-[#2b3139]" />
+                                    </div>
+                                    <div>
+                                        <h3 className="text-lg font-bold text-[#eaecef]">Ready for Simulation</h3>
+                                        <p className="text-sm text-[#848e9c]">Select a market and build your strategy to begin.</p>
+                                    </div>
+                                </div>
                             )}
                         </motion.div>
                     )}

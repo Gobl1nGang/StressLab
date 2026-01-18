@@ -156,7 +156,7 @@ export async function adaptiveUpdate(
 /**
  * Get ML system status
  */
-export async function getMLStatus(): Promise<any> {
+export async function getMLStatus(): Promise<Record<string, string | number | boolean>> {
     const response = await fetch(`${ADVANCED_API_BASE}/status`);
 
     if (!response.ok) {

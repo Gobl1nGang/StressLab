@@ -3,7 +3,6 @@ uvicorn
 pydantic
 python-multipart
 requests
-yfinance==0.2.33
 pandas
 numpy
 torch

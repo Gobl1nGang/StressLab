@@ -67,7 +67,7 @@ export default function SimulationDashboard({ states, results, isSimulating }: S
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center space-x-2">
                         <Zap className="w-4 h-4 text-[#f0b90b]" />
-                        <h2 className="text-sm font-bold text-[#eaecef]">LIVE EXECUTION ENGINE</h2>
+                        <h2 className="text-sm font-bold text-[#eaecef]">LIVE MARKET FEED</h2>
                     </div>
                     {isSimulating && (
                         <div className="flex items-center space-x-2 bg-[#f6465d]/10 px-2 py-1 rounded border border-[#f6465d]/20">
@@ -80,19 +80,20 @@ export default function SimulationDashboard({ states, results, isSimulating }: S
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData}>
                             <defs>
-                                <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                                <linearGradient id="colorPrice" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#f0b90b" stopOpacity={0.3} />
                                     <stop offset="95%" stopColor="#f0b90b" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="#2b3139" vertical={false} />
-                            <XAxis dataKey="date" stroke="#474d57" fontSize={10} tickLine={false} axisLine={false} />
+                            <XAxis dataKey="index" stroke="#474d57" fontSize={10} tickLine={false} axisLine={false} tickFormatter={(i) => chartData[i]?.date || ''} />
                             <YAxis stroke="#474d57" fontSize={10} tickLine={false} axisLine={false} domain={['auto', 'auto']} tickFormatter={(v) => `$${v}`} />
                             <Tooltip
                                 contentStyle={{ backgroundColor: '#1e2329', border: '1px solid #2b3139', borderRadius: '4px', fontSize: '12px' }}
                                 itemStyle={{ color: '#f0b90b' }}
+                                labelFormatter={(i) => `Date: ${chartData[i]?.date || ''}`}
                             />
-                            <Area type="monotone" dataKey="equity" stroke="#f0b90b" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2} isAnimationActive={false} />
+                            <Area type="linear" dataKey="price" stroke="#f0b90b" fillOpacity={1} fill="url(#colorPrice)" strokeWidth={2} isAnimationActive={false} />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

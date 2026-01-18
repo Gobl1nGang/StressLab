@@ -30,8 +30,19 @@ class RealtimeSimulator:
         self.strategy = strategy
         self.initial_capital = initial_capital
         
-        # Load full dataset
-        self.data = fetch_market_data(ticker, period="2y")
+        # Load dataset (Mock or Real)
+        if self.ticker.upper() == "MOCK":
+            dates = pd.date_range(end=datetime.now(), periods=500, freq="D")
+            prices = 100 + np.random.randn(500).cumsum()
+            self.data = pd.DataFrame({
+                "Open": prices,
+                "High": prices + 1,
+                "Low": prices - 1,
+                "Close": prices,
+                "Volume": 100000
+            }, index=dates)
+        else:
+            self.data = fetch_market_data(ticker, period="2y")
         
         # Split into training and simulation periods
         split_point = int(len(self.data) * 0.7)  # 70% train, 30% simulate

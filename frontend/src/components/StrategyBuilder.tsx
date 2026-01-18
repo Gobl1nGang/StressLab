@@ -1,24 +1,15 @@
 "use client";
 import React, { useState } from 'react';
-import { IndicatorConfig, StrategyRequest } from '../lib/api';
+import { IndicatorConfig, StrategyRequest, Rule } from '../lib/api';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X, Settings2, Play, Search, ShieldAlert, ArrowRightLeft } from 'lucide-react';
 
-interface Rule {
-    type: 'buy' | 'sell';
-    condition: 'threshold' | 'crossover' | 'crossunder';
-    indicator?: string;
-    operator?: string;
-    value?: number;
-    ind1?: string;
-    ind2?: string;
-}
-
 interface StrategyBuilderProps {
     onRunBacktest: (strategy: StrategyRequest) => void;
+    isLoading?: boolean;
 }
 
-export default function StrategyBuilder({ onRunBacktest }: StrategyBuilderProps) {
+export default function StrategyBuilder({ onRunBacktest, isLoading }: StrategyBuilderProps) {
     const [ticker, setTicker] = useState('BTC-USD');
     const [indicators, setIndicators] = useState<IndicatorConfig[]>([
         { name: 'SMA', params: { window: 20 } },
@@ -54,7 +45,9 @@ export default function StrategyBuilder({ onRunBacktest }: StrategyBuilderProps)
             ticker,
             indicators,
             rules,
-            initial_capital: 10000
+            initial_capital: 10000,
+            start_date: "2023-01-01",
+            end_date: "2024-01-01"
         });
     };
 
@@ -159,7 +152,7 @@ export default function StrategyBuilder({ onRunBacktest }: StrategyBuilderProps)
                                         value={rule.condition}
                                         onChange={(e) => {
                                             const newRules = [...rules];
-                                            newRules[idx].condition = e.target.value as any;
+                                            newRules[idx].condition = e.target.value as 'threshold' | 'crossover' | 'crossunder';
                                             setRules(newRules);
                                         }}
                                         className="text-[10px] p-1.5 bg-[#1e2329] border border-[#2b3139] rounded text-[#eaecef] outline-none"
@@ -230,10 +223,15 @@ export default function StrategyBuilder({ onRunBacktest }: StrategyBuilderProps)
                 <div className="pt-4 border-t border-[#2b3139]">
                     <button
                         type="submit"
-                        className="w-full py-3 bg-[#f0b90b] hover:bg-[#fcd535] text-black font-bold rounded flex items-center justify-center space-x-2 transition-all active:scale-[0.98]"
+                        disabled={isLoading}
+                        className={`w-full py-3 ${isLoading ? 'bg-[#2b3139] text-[#474d57]' : 'bg-[#f0b90b] hover:bg-[#fcd535] text-black'} font-bold rounded flex items-center justify-center space-x-2 transition-all active:scale-[0.98] transition-colors`}
                     >
-                        <Play className="w-4 h-4 fill-current" />
-                        <span>Launch Simulation</span>
+                        {isLoading ? (
+                            <div className="w-4 h-4 border-2 border-[#474d57] border-t-transparent rounded-full animate-spin"></div>
+                        ) : (
+                            <Play className="w-4 h-4 fill-current" />
+                        )}
+                        <span>{isLoading ? 'Simulation in Progress' : 'Launch Simulation'}</span>
                     </button>
                     <p className="mt-2 text-[10px] text-[#474d57] text-center">
                         Initial Capital: $10,000.00

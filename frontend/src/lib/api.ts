@@ -1,18 +1,28 @@
-const API_URL = 'http://127.0.0.1:8000';
-const USE_MOCK = false; // Set to false to connect to the real backend
+const API_URL = 'http://localhost:8000';
+const USE_MOCK = true; // Set to false to connect to the real backend
+
+export interface Rule {
+    type: string;  // 'buy' or 'sell'
+    condition: string;  // 'threshold', 'crossover', 'crossunder'
+    indicator?: string;
+    operator?: string;
+    value?: number;
+    ind1?: string;
+    ind2?: string;
+}
 
 export interface IndicatorConfig {
     name: string;
-    params: Record<string, any>;
+    params: Record<string, number>;
 }
 
 export interface StrategyRequest {
     ticker: string;
     indicators: IndicatorConfig[];
-    rules: any[];
+    rules: Rule[];
     initial_capital: number;
-    start_date: string;
-    end_date: string;
+    start_date?: string;
+    end_date?: string;
 }
 
 export interface Trade {
