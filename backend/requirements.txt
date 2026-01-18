@@ -10,3 +10,4 @@ torch
 scikit-learn
 python-jose[cryptography]
 passlib[argon2]
+transformers

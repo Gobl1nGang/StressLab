@@ -5,10 +5,19 @@ class IndicatorConfig(BaseModel):
     name: str
     params: Dict[str, Any]
 
+class Rule(BaseModel):
+    type: str  # 'buy' or 'sell'
+    condition: str  # 'threshold', 'crossover', 'crossunder'
+    indicator: Optional[str] = None
+    operator: Optional[str] = None
+    value: Optional[float] = None
+    ind1: Optional[str] = None
+    ind2: Optional[str] = None
+
 class StrategyRequest(BaseModel):
     ticker: str
     indicators: List[IndicatorConfig]
-    rules: List[Dict[str, Any]] # Placeholder for rule definition
+    rules: List[Rule]
     initial_capital: float = 10000.0
 
 class Trade(BaseModel):
