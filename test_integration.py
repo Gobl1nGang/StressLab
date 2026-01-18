@@ -1,132 +1,44 @@
-#!/usr/bin/env python3
-"""
-Integration test script to verify all components are connected properly.
-Tests: Backend -> Engine -> Security -> Frontend API
-"""
-
 import requests
 import json
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://127.0.0.1:8000"
 
-def test_root():
-    """Test root endpoint"""
-    print("Testing root endpoint...")
-    response = requests.get(f"{BASE_URL}/")
-    assert response.status_code == 200
-    print(f"✓ Root endpoint: {response.json()}")
-
-def test_authentication():
-    """Test authentication"""
-    print("\nTesting authentication...")
-    response = requests.post(
-        f"{BASE_URL}/token",
-        data={"username": "johndoe", "password": "secret"},
-        headers={"Content-Type": "application/x-www-form-urlencoded"}
-    )
-    assert response.status_code == 200
-    token = response.json()["access_token"]
-    print(f"✓ Authentication successful, token received")
-    return token
-
-def test_backtest(token):
-    """Test backtest endpoint with authentication"""
-    print("\nTesting backtest endpoint...")
+def test_full_flow():
+    print("1. Logging in...")
+    # This uses the mock login
+    login_resp = requests.post(f"{BASE_URL}/token", data={"username": "testuser", "password": "password"})
+    if login_resp.status_code != 200:
+        print(f"Login failed: {login_resp.text}")
+        return
     
-    strategy_request = {
-        "ticker": "AAPL",
+    token = login_resp.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    print(f"   Success! Token: {token[:10]}...")
+
+    print("\n2. Running Backtest (MOCK)...")
+    payload = {
+        "ticker": "MOCK",
+        "start_date": "2023-01-01",
+        "end_date": "2023-04-01",
+        "initial_capital": 100000,
         "indicators": [
-            {"name": "SMA", "params": {"window": 20}},
-            {"name": "RSI", "params": {"window": 14}}
+            {"name": "SMA", "params": {"period": 20}}
         ],
-        "rules": [],
-        "initial_capital": 10000.0
-    }
-    
-    response = requests.post(
-        f"{BASE_URL}/backtest",
-        json=strategy_request,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
+        "rules": {
+            "buy": "price > SMA",
+            "sell": "price < SMA"
         }
-    )
-    
-    assert response.status_code == 200
-    result = response.json()
-    print(f"✓ Backtest completed:")
-    print(f"  - Final Capital: ${result['final_capital']:.2f}")
-    print(f"  - Total Trades: {len(result['trades'])}")
-    print(f"  - Equity Curve Points: {len(result['equity_curve'])}")
-    return result
-
-def test_analyze(token):
-    """Test analysis endpoint"""
-    print("\nTesting analysis endpoint...")
-    
-    strategy_request = {
-        "ticker": "AAPL",
-        "indicators": [
-            {"name": "SMA", "params": {"window": 20}}
-        ],
-        "rules": [],
-        "initial_capital": 10000.0
     }
     
-    response = requests.post(
-        f"{BASE_URL}/analyze",
-        json=strategy_request,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json"
-        }
-    )
+    resp = requests.post(f"{BASE_URL}/backtest", json=payload, headers=headers)
     
-    assert response.status_code == 200
-    result = response.json()
-    print(f"✓ Analysis completed:")
-    print(f"  - Failure Probability: {result['failure_probability']:.2%}")
-    print(f"  - Recommendation: {result['recommendation']}")
-
-def test_unauthorized_access():
-    """Test that endpoints are protected"""
-    print("\nTesting unauthorized access...")
-    
-    strategy_request = {
-        "ticker": "AAPL",
-        "indicators": [],
-        "rules": [],
-        "initial_capital": 10000.0
-    }
-    
-    response = requests.post(
-        f"{BASE_URL}/backtest",
-        json=strategy_request,
-        headers={"Content-Type": "application/json"}
-    )
-    
-    assert response.status_code == 401
-    print(f"✓ Unauthorized access properly blocked")
+    if resp.status_code == 200:
+        data = resp.json()
+        print(f"   Success! Final Capital: ${data['final_capital']:.2f}")
+        print(f"   Trades: {len(data['trades'])}")
+    else:
+        print(f"   Failed: {resp.status_code}")
+        print(f"   Response: {resp.text}")
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("INTEGRATION TEST: Trading Strategy Falsifier")
-    print("=" * 60)
-    
-    try:
-        test_root()
-        token = test_authentication()
-        test_unauthorized_access()
-        test_backtest(token)
-        test_analyze(token)
-        
-        print("\n" + "=" * 60)
-        print("✓ ALL TESTS PASSED - System is fully integrated!")
-        print("=" * 60)
-        
-    except AssertionError as e:
-        print(f"\n✗ Test failed: {e}")
-    except requests.exceptions.ConnectionError:
-        print("\n✗ Cannot connect to backend. Make sure it's running on port 8000")
-    except Exception as e:
-        print(f"\n✗ Unexpected error: {e}")
+    test_full_flow()

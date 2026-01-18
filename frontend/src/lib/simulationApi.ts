@@ -1,14 +1,13 @@
 // Frontend API client for real-time simulation
+import { ACCESS_TOKEN, Rule, IndicatorConfig } from './api';
 
-const SIMULATION_API_BASE = 'http://localhost:8000/simulation';
+const API_URL = 'http://localhost:8000';
+const SIMULATION_API_BASE = `${API_URL}/simulation`;
 
 export interface SimulationRequest {
     ticker: string;
-    indicators: Array<{
-        name: string;
-        params: Record<string, number>;
-    }>;
-    rules: any[];
+    indicators: IndicatorConfig[];
+    rules: Rule[];
     initial_capital?: number;
     speed?: number; // Days per second
 }
@@ -43,7 +42,7 @@ export interface SimulationResults {
     total_return: number;
     return_percentage: number;
     total_trades: number;
-    trades: any[];
+    trades: Array<{ date: string; type: string; price: number; type_label: string }>;
     equity_curve: number[];
     max_equity: number;
     min_equity: number;
@@ -57,15 +56,16 @@ export async function streamSimulation(
     request: SimulationRequest,
     onUpdate: (state: SimulationState) => void,
     onComplete: (results: SimulationResults) => void,
-    onError: (error: string) => void
+    onError: (error: string) => void,
+    signal?: AbortSignal
 ): Promise<void> {
     try {
-        const token = localStorage.getItem('access_token');
         const response = await fetch(`${SIMULATION_API_BASE}/stream`, {
             method: 'POST',
+            signal,
             headers: {
                 'Content-Type': 'application/json',
-                ...(token && { 'Authorization': `Bearer ${token}` })
+                ...(ACCESS_TOKEN && { 'Authorization': `Bearer ${ACCESS_TOKEN}` })
             },
             body: JSON.stringify(request)
         });
@@ -110,8 +110,9 @@ export async function streamSimulation(
                 }
             }
         }
-    } catch (error: any) {
-        onError(error.message || 'Connection error');
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Connection error';
+        onError(errorMessage);
     }
 }
 
@@ -121,17 +122,15 @@ export async function streamSimulation(
 export async function runSimulation(
     request: SimulationRequest
 ): Promise<{
-    info: any;
+    info: { training_period: [string, string], simulation_period: [string, string] };
     states: SimulationState[];
     results: SimulationResults;
 }> {
-    const token = localStorage.getItem('access_token');
-
     const response = await fetch(`${SIMULATION_API_BASE}/run`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` })
+            ...(ACCESS_TOKEN && { 'Authorization': `Bearer ${ACCESS_TOKEN}` })
         },
         body: JSON.stringify(request)
     });
@@ -148,14 +147,12 @@ export async function runSimulation(
  */
 export async function getSimulationInfo(
     request: SimulationRequest
-): Promise<any> {
-    const token = localStorage.getItem('access_token');
-
+): Promise<{ training_period: [string, string], simulation_period: [string, string] }> {
     const response = await fetch(`${SIMULATION_API_BASE}/info`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            ...(token && { 'Authorization': `Bearer ${token}` })
+            ...(ACCESS_TOKEN && { 'Authorization': `Bearer ${ACCESS_TOKEN}` })
         },
         body: JSON.stringify(request)
     });

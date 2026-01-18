@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
+from typing import List, Optional, Dict, Any
 
 class IndicatorConfig(BaseModel):
     name: str
@@ -16,9 +16,11 @@ class Rule(BaseModel):
 
 class StrategyRequest(BaseModel):
     ticker: str
+    start_date: Optional[str] = "2023-01-01"
+    end_date: Optional[str] = "2023-04-01"
+    initial_capital: float = 10000.0
     indicators: List[IndicatorConfig]
     rules: List[Rule]
-    initial_capital: float = 10000.0
 
 class Trade(BaseModel):
     date: str
@@ -27,7 +29,7 @@ class Trade(BaseModel):
 
 class BacktestResponse(BaseModel):
     final_capital: float
-    trades: List[Trade]
+    trades: List[Dict[str, Any]]
     equity_curve: List[float]
 
 class AnalysisResponse(BaseModel):

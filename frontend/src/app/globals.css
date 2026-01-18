@@ -1,26 +1,106 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+    --background: #0b0e11;
+    --foreground: #eaecef;
+    --primary: #f0b90b;
+    --primary-hover: #fcd535;
+    --secondary: #1e2329;
+    --muted: #474d57;
+    --success: #0ecb81;
+    --danger: #f6465d;
+    --border: #2b3139;
+    --card-bg: #1e2329;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism utility */
+.glass {
+    background: rgba(30, 35, 41, 0.7);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--muted);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--border);
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+}
+
+/* Binance Card Styles */
+.binance-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    transition: border-color 0.2s ease;
+}
+
+.binance-card:hover {
+    border-color: var(--muted);
+}
+
+.binance-input {
+    background-color: #2b3139;
+    border: 1px solid transparent;
+    color: var(--foreground);
+    border-radius: 4px;
+    padding: 8px 12px;
+    transition: border-color 0.2s ease;
+}
+
+.binance-input:focus {
+    border-color: var(--primary);
+    outline: none;
+}
+
+.binance-btn-primary {
+    background-color: var(--primary);
+    color: #000;
+    font-weight: 600;
+    border-radius: 4px;
+    padding: 8px 16px;
+    transition: opacity 0.2s ease;
+}
+
+.binance-btn-primary:hover {
+    opacity: 0.9;
+    background-color: var(--primary-hover);
 }
