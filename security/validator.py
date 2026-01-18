@@ -1,6 +1,7 @@
 import re
 import html
 import unicodedata
+import requests
 from typing import List, Optional, Any
 from pydantic import BaseModel, validator, ValidationError
 
@@ -185,6 +186,26 @@ class QueryFilter(BaseModel):
     @validator('value')
     def validate_value(cls, v):
         return SQLDataValidator.sanitize_input(v)
+
+# Get credentials from port 8000 and process them
+def process_credentials() -> str:
+    """Get credentials from port 8000, validate and send to port 8001"""
+    try:
+        # Get dictionary from port 8000
+        response = requests.get('http://localhost:8000/credentials')
+        credentials = response.json()
+        
+        # Validate credentials
+        validated_creds = validate_credentials(credentials)
+        
+        # Send to port 8001
+        auth_response = requests.post('http://localhost:8001/auth', json=validated_creds)
+        return f"Success: {auth_response.status_code}"
+        
+    except ValueError as e:
+        return str(e)
+    except requests.RequestException as e:
+        return f"Network error: {str(e)}"
 
 # Validate username/password dictionary and return original if safe
 def validate_credentials(credentials: dict) -> dict:
